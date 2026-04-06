@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aiogtrans"
+version = "1.2.3"
+description = "An async and updated version of the googletrans package."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Ben Z", email = "bleg3ndary@gmail.com" }]
+keywords = ["google", "translate", "translator", "async"]
+requires-python = ">=3.9"
+dependencies = ["httpx>=0.23.0,<1.0.0"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Education",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Education",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+[project.urls]
+Homepage = "https://github.com/Leg3ndary/aiogtrans"
+
+[project.scripts]
+aiogtrans = "aiogtrans.__main__:main"
+
+[tool.setuptools.packages.find]
+exclude = ["docs*", "tests*"]

@@ -5,6 +5,7 @@ Async Google Translate client.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import random
 from types import TracebackType
@@ -13,6 +14,7 @@ from typing import Optional, Sequence, Union
 import httpx
 
 from aiogtrans import urls
+from aiogtrans.cache import Cache
 from aiogtrans.constants import (
     DEFAULT_CLIENT_SERVICE_URLS,
     DEFAULT_FALLBACK_SERVICE_URLS,
@@ -22,6 +24,7 @@ from aiogtrans.constants import (
     LANGUAGES,
     SPECIAL_CASES,
 )
+from aiogtrans.exceptions import HTTPError, TranslationError
 from aiogtrans.models import Detected, Translated, TranslatedPart
 
 RPC_ID = "MkEWBc"
@@ -39,13 +42,19 @@ class Translator:
     user_agent:
         ``User-Agent`` header value sent with every request.
     raise_exception:
-        When ``True``, non-200 responses raise an :class:`Exception`.
+        When ``True``, non-200 responses raise an :class:`HTTPError`.
         Defaults to ``False``.
     timeout:
         HTTP request timeout in seconds.
     use_fallback:
         Use ``translate.googleapis.com`` (the ``gtx`` client type) instead of
         the default ``tw-ob`` endpoint.
+    cache_capacity:
+        Number of translation/detection results to cache in memory (LRU).
+        ``0`` disables caching (default).
+    retries:
+        Number of HTTP attempts before raising :class:`TranslationError`.
+        Defaults to ``3``.
     """
 
     def __init__(
@@ -55,9 +64,13 @@ class Translator:
         raise_exception: bool = DEFAULT_RAISE_EXCEPTION,
         timeout: Union[int, float] = 10.0,
         use_fallback: bool = False,
+        cache_capacity: int = 0,
+        retries: int = 3,
         _aclient: Optional[httpx.AsyncClient] = None,
     ) -> None:
         self.raise_exception = raise_exception
+        self.retries = retries
+        self._cache: Optional[Cache] = Cache(cache_capacity) if cache_capacity > 0 else None
 
         if use_fallback:
             self.service_urls: Sequence[str] = DEFAULT_FALLBACK_SERVICE_URLS
@@ -123,17 +136,32 @@ class Translator:
         data = {"f.req": self._build_rpc_request(text, dest, src)}
         params = {
             "rpcids": RPC_ID,
+            # NOTE: This build label is from 2020 and may become stale if Google
+            # changes their API version checks. Update if translation stops working.
             "bl": "boq_translate-webserver_20201207.13_p0",
             "soc-app": 1,
             "soc-platform": 1,
             "soc-device": 1,
             "rt": "c",
         }
-        response = await self._aclient.post(url, params=params, data=data)
+
+        last_exc: Optional[Exception] = None
+        response: Optional[httpx.Response] = None
+        for attempt in range(self.retries):
+            try:
+                response = await self._aclient.post(url, params=params, data=data)
+                break
+            except Exception as exc:
+                last_exc = exc
+                if attempt < self.retries - 1:
+                    await asyncio.sleep(2 ** attempt)
+        else:
+            raise TranslationError(
+                f"Request failed after {self.retries} attempts"
+            ) from last_exc
+
         if response.status_code != 200 and self.raise_exception:
-            raise Exception(
-                f'Unexpected status code "{response.status_code}" from {self.service_urls}'
-            )
+            raise HTTPError(response.status_code, self.service_urls)
         return response.text, response
 
     def _parse_response(self, data: str) -> str:
@@ -189,6 +217,9 @@ class Translator:
         -------
         Translated
         """
+        if len(text) > 15000:
+            raise ValueError(f"Text too long: {len(text)} characters (max 15 000)")
+
         dest = dest.lower().split("_", 1)[0]
         src = src.lower().split("_", 1)[0]
 
@@ -208,6 +239,12 @@ class Translator:
             else:
                 raise ValueError(f"Invalid destination language: {dest!r}")
 
+        cache_key = f"{src}:{dest}:{text}"
+        if self._cache is not None:
+            cached = self._cache.get(cache_key)
+            if cached is not None:
+                return cached  # type: ignore[return-value]
+
         origin = text
         raw, response = await self._translate(text, dest, src)
         resp = self._parse_response(raw)
@@ -216,7 +253,7 @@ class Translator:
             outer = json.loads(resp)
             parsed = json.loads(outer[0][2])
         except Exception as exc:
-            raise Exception(
+            raise TranslationError(
                 f"Failed to parse translation response: {exc}\nResponse: {response}"
             ) from exc
 
@@ -258,8 +295,12 @@ class Translator:
             "origin_pronunciation": origin_pronunciation,
             "parsed": parsed,
         }
+        try:
+            extra_data["confidence"] = parsed[0][1][0][0]
+        except (IndexError, KeyError, TypeError):
+            pass
 
-        return Translated(
+        result = Translated(
             src=src,
             dest=dest,
             origin=origin,
@@ -269,6 +310,9 @@ class Translator:
             extra_data=extra_data,
             response=response,
         )
+        if self._cache is not None:
+            self._cache.add(cache_key, result)
+        return result
 
     async def detect(self, text: str) -> Detected:
         """
@@ -283,9 +327,27 @@ class Translator:
         -------
         Detected
         """
+        cache_key = f"detect:{text}"
+        if self._cache is not None:
+            cached = self._cache.get(cache_key)
+            if cached is not None:
+                return cached  # type: ignore[return-value]
+
         translated = await self.translate(text, src="auto", dest="en")
-        return Detected(
+        result = Detected(
             lang=translated.src,
             confidence=translated.extra_data.get("confidence") if translated.extra_data else None,
-            response=translated._response,
+            response=translated.response,
         )
+        if self._cache is not None:
+            self._cache.add(cache_key, result)
+        return result
+
+    async def translate_bulk(
+        self,
+        texts: list[str],
+        dest: str = "en",
+        src: str = "auto",
+    ) -> list[Translated]:
+        """Translate multiple texts concurrently."""
+        return list(await asyncio.gather(*[self.translate(t, dest=dest, src=src) for t in texts]))

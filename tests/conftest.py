@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 import httpx
 import pytest
 
-RPC_ID = "MkEWBc"
+from aiogtrans.client import RPC_ID
 
 
 def make_rpc_response(

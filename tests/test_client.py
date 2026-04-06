@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from aiogtrans import Translator
+from aiogtrans.exceptions import HTTPError, TranslationError
 from aiogtrans.models import Detected, Translated, TranslatedPart
 
 from .conftest import make_mock_client, make_rpc_response
@@ -121,6 +122,42 @@ async def test_translate_spacing() -> None:
     assert result.text == "Hello world"
 
 
+@pytest.mark.asyncio
+async def test_translate_text_too_long() -> None:
+    """translate() raises ValueError when text exceeds 15 000 characters."""
+    translator = Translator(_aclient=make_mock_client(""))
+
+    with pytest.raises(ValueError, match="Text too long"):
+        await translator.translate("x" * 15001, dest="en")
+
+
+@pytest.mark.asyncio
+async def test_translate_caches_result() -> None:
+    """translate() returns cached result on second call without extra HTTP request."""
+    response_text = make_rpc_response("Hello", src_lang="es")
+    mock_client = make_mock_client(response_text)
+    translator = Translator(_aclient=mock_client, cache_capacity=100)
+
+    result1 = await translator.translate("Hola", src="es", dest="en")
+    result2 = await translator.translate("Hola", src="es", dest="en")
+
+    assert result1 is result2
+    mock_client.post.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_translate_bulk_basic() -> None:
+    """translate_bulk() returns a result for each input text."""
+    response_text = make_rpc_response("Hello", src_lang="es")
+    mock_client = make_mock_client(response_text)
+    translator = Translator(_aclient=mock_client)
+
+    results = await translator.translate_bulk(["Hola", "Mundo"], dest="en")
+
+    assert len(results) == 2
+    assert all(isinstance(r, Translated) for r in results)
+
+
 # ---------------------------------------------------------------------------
 # detect()
 # ---------------------------------------------------------------------------
@@ -172,13 +209,13 @@ async def test_context_manager_closes_client() -> None:
 
 @pytest.mark.asyncio
 async def test_raise_exception_on_non_200() -> None:
-    """raise_exception=True causes an Exception on non-200 status codes."""
+    """raise_exception=True causes an HTTPError on non-200 status codes."""
     translator = Translator(
         _aclient=make_mock_client("", status_code=429),
         raise_exception=True,
     )
 
-    with pytest.raises(Exception, match="429"):
+    with pytest.raises(HTTPError):
         await translator.translate("hello", dest="en")
 
 
@@ -192,5 +229,5 @@ async def test_no_raise_on_non_200_by_default() -> None:
         raise_exception=False,
     )
 
-    with pytest.raises(Exception, match="Failed to parse"):
+    with pytest.raises(TranslationError, match="Failed to parse"):
         await translator.translate("hello", dest="en")

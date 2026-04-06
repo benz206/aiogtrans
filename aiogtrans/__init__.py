@@ -10,8 +10,14 @@ __all__ = (
     "LANGUAGES",
     "Translated",
     "Detected",
+    "TranslatedPart",
+    "Cache",
+    "HTTPError",
+    "TranslationError",
 )
 
 from aiogtrans.client import Translator
 from aiogtrans.constants import LANGCODES, LANGUAGES
-from aiogtrans.models import Detected, Translated
+from aiogtrans.models import Detected, Translated, TranslatedPart
+from aiogtrans.cache import Cache
+from aiogtrans.exceptions import HTTPError, TranslationError

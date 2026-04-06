@@ -14,6 +14,10 @@ class Base:
     def __init__(self, response: Optional[httpx.Response] = None) -> None:
         self._response = response
 
+    @property
+    def response(self) -> Optional[httpx.Response]:
+        return self._response
+
 
 class TranslatedPart:
     """A single segment of a translated result with its translation candidates."""
