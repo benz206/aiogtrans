@@ -1,5 +1,5 @@
 """
-Cache related things go here
+LRU cache for translation and detection results.
 
 Copyright (c) 2022 Ben Z
 
@@ -14,64 +14,47 @@ The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
 """
 
-import typing
+from __future__ import annotations
+
 from collections import OrderedDict
+from typing import Optional, Union
 
 from .models import Detected, Translated
 
 
 class Cache:
     """
-    LRU based cache to store api calls, 2 will usually be created, one for translations, and one for detections, respectively
+    LRU cache for API call results.
+
+    Two instances are typically created per :class:`~aiogtrans.Translator`:
+    one for translations and one for detections.
+
+    Parameters
+    ----------
+    capacity:
+        Maximum number of entries before the oldest is evicted. Default 1 000.
     """
 
     def __init__(self, capacity: int = 1000) -> None:
-        """Cache Init
-
-        Parameters
-        ----------
-        capacity: int
-            The amount of items to be stored in the cache
-            Default 1,000
-
-        Returns
-        -------
-        None"""
-        self.cache = OrderedDict()
+        self._cache: OrderedDict[str, Union[Translated, Detected]] = OrderedDict()
         self.capacity = capacity
 
-    def get(self, key: str) -> typing.Union[Translated, Detected]:
-        """Retrieve a key
+    def get(self, key: str) -> Optional[Union[Translated, Detected]]:
+        """Return the cached value for *key*, or ``None`` if not present."""
+        if key not in self._cache:
+            return None
+        self._cache.move_to_end(key)
+        return self._cache[key]
 
-        Parameters
-        ----------
-        key: str
-            The key or translation keyword that will be queried
+    def add(self, key: str, value: Union[Translated, Detected]) -> None:
+        """Store *value* under *key*, evicting the oldest entry if over capacity."""
+        self._cache[key] = value
+        self._cache.move_to_end(key)
+        if len(self._cache) > self.capacity:
+            self._cache.popitem(last=False)
 
-        Returns
-        -------
-        Translated, Detected
-            The Translated or Detected cached object"""
-        if key not in self.cache:
-            return -1
-        else:
-            self.cache.move_to_end(key)
-            return self.cache[key]
+    def __len__(self) -> int:
+        return len(self._cache)
 
-    def add(self, key: str, value: typing.Union[Translated, Detected]) -> None:
-        """Add a key and value to the cache
-
-        Parameters
-        ----------
-        key: str
-            Keyword/words whatever
-        value: Translated, Detected
-            The object to store
-
-        Returns
-        -------
-        None"""
-        self.cache[key] = value
-        self.cache.move_to_end(key)
-        if len(self.cache) > self.capacity:
-            self.cache.popitem(last=False)
+    def __contains__(self, key: str) -> bool:
+        return key in self._cache

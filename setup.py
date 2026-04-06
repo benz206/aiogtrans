@@ -15,13 +15,11 @@ def get_file(*paths):
 
 
 def get_version():
-    version = "1.1.10"
-    return version
+    return "1.2.0"
 
 
 def get_description():
-    description = """An async and updated version of the googletrans package."""
-    return description
+    return "An async and updated version of the googletrans package."
 
 
 def get_readme():
@@ -29,8 +27,7 @@ def get_readme():
 
 
 def get_requirements():
-    requirements = ["httpx<=0.27.0", "setuptools==58.1.0"]
-    return requirements
+    return ["httpx>=0.23.0,<1.0.0"]
 
 
 def install():
@@ -48,13 +45,14 @@ def install():
             "Development Status :: 5 - Production/Stable",
             "Intended Audience :: Education",
             "Intended Audience :: End Users/Desktop",
-            "License :: Freeware",
-            "Operating System :: POSIX",
-            "Operating System :: Microsoft :: Windows",
-            "Operating System :: MacOS :: MacOS X",
+            "License :: OSI Approved :: MIT License",
+            "Operating System :: OS Independent",
             "Topic :: Education",
             "Programming Language :: Python",
             "Programming Language :: Python :: 3.9",
+            "Programming Language :: Python :: 3.10",
+            "Programming Language :: Python :: 3.11",
+            "Programming Language :: Python :: 3.12",
         ],
         packages=find_packages(exclude=["docs", "tests"]),
         keywords="google translate translator async",

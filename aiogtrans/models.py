@@ -12,59 +12,58 @@ The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
 """
 
-import typing
+from __future__ import annotations
 
-from aiohttp import ClientResponse
-from httpx import Response
+from typing import Optional
+
+import httpx
 
 
 class Base:
-    """
-    Base class for response objects such as Translated and Detected
-    """
+    """Base class for response objects such as Translated and Detected."""
 
-    __slots__ = "_response"
+    __slots__ = ("_response",)
 
-    def __init__(self, response: typing.Union[Response, ClientResponse] = None) -> None:
-        """
-        Base class for basically all objects
-        """
+    def __init__(self, response: Optional[httpx.Response] = None) -> None:
         self._response = response
 
 
 class TranslatedPart:
-    """
-    Translated parts
-    """
+    """A single segment of a translated result with its translation candidates."""
 
     __slots__ = ("text", "candidates")
 
-    def __init__(self, text: str, candidates: typing.List[str]) -> None:
-        """
-        Init for translated parts
-        """
+    def __init__(self, text: str, candidates: list[str]) -> None:
         self.text = text
         self.candidates = candidates
 
     def __str__(self) -> str:
         return self.text
 
-    def __dict__(self) -> dict:
-        return {
-            "text": self.text,
-            "candidates": self.candidates,
-        }
+    def __repr__(self) -> str:
+        return f"TranslatedPart(text={self.text!r}, candidates={self.candidates!r})"
 
 
 class Translated(Base):
     """
-    Translate result object
+    Result object returned by :meth:`Translator.translate`.
 
-    :param src: source language (default: auto)
-    :param dest: destination language (default: en)
-    :param origin: original text
-    :param text: translated text
-    :param pronunciation: pronunciation
+    Attributes
+    ----------
+    src:
+        Detected or specified source language code.
+    dest:
+        Destination language code.
+    origin:
+        Original input text.
+    text:
+        Translated text.
+    pronunciation:
+        Romanised pronunciation of the translated text (may be ``None``).
+    parts:
+        List of :class:`TranslatedPart` segments.
+    extra_data:
+        Raw extra data extracted from the API response.
     """
 
     __slots__ = (
@@ -83,14 +82,11 @@ class Translated(Base):
         dest: str,
         origin: str,
         text: str,
-        pronunciation: str,
-        parts: typing.List[TranslatedPart],
-        extra_data=None,
+        pronunciation: Optional[str],
+        parts: list[TranslatedPart],
+        extra_data: Optional[dict] = None,
         **kwargs,
     ) -> None:
-        """
-        Init for translated object
-        """
         super().__init__(**kwargs)
         self.src = src
         self.dest = dest
@@ -101,43 +97,39 @@ class Translated(Base):
         self.extra_data = extra_data
 
     def __str__(self) -> str:
-        return self.__unicode__()
+        return (
+            f"Translated(src={self.src}, dest={self.dest}, text={self.text}, "
+            f"pronunciation={self.pronunciation})"
+        )
 
-    def __unicode__(self) -> str:
-        return f"Translated(src={self.src}, dest={self.dest}, text={self.text}, pronunciation={self.pronunciation}, extra_data={repr(self.extra_data)[:10]}...)"
-
-    def __dict__(self) -> dict:
-        return {
-            "src": self.src,
-            "dest": self.dest,
-            "origin": self.origin,
-            "text": self.text,
-            "pronunciation": self.pronunciation,
-            "extra_data": self.extra_data,
-            "parts": list(map(lambda part: part.__dict__(), self.parts)),
-        }
+    def __repr__(self) -> str:
+        return (
+            f"Translated(src={self.src!r}, dest={self.dest!r}, origin={self.origin!r}, "
+            f"text={self.text!r}, pronunciation={self.pronunciation!r})"
+        )
 
 
 class Detected(Base):
     """
-    Language detection result object
+    Result object returned by :meth:`Translator.detect`.
 
-    :param lang: detected language
-    :param confidence: the confidence of detection result (0.00 to 1.00)
+    Attributes
+    ----------
+    lang:
+        Detected language code.
+    confidence:
+        Confidence score (``None`` if unavailable).
     """
 
     __slots__ = ("lang", "confidence")
 
-    def __init__(self, lang: str, confidence: float, **kwargs) -> None:
-        """
-        Init for detected object
-        """
+    def __init__(self, lang: str, confidence: Optional[float], **kwargs) -> None:
         super().__init__(**kwargs)
         self.lang = lang
         self.confidence = confidence
 
     def __str__(self) -> str:
-        return self.__unicode__()
-
-    def __unicode__(self) -> str:
         return f"Detected(lang={self.lang}, confidence={self.confidence})"
+
+    def __repr__(self) -> str:
+        return f"Detected(lang={self.lang!r}, confidence={self.confidence!r})"

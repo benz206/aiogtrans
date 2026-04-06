@@ -128,3 +128,6 @@ dmypy.json
 cython_debug/
 
 test_basic.py
+
+.DS_Store
+CLAUDE.md
