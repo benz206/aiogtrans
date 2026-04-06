@@ -15,7 +15,7 @@ def get_file(*paths):
 
 
 def get_version():
-    return "1.2.1"
+    return "1.2.2"
 
 
 def get_description():
