@@ -30,7 +30,7 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Leg3ndary/aiogtrans"
+Homepage = "https://github.com/benz206/aiogtrans"
 
 [project.scripts]
 aiogtrans = "aiogtrans.__main__:main"
