@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Async Google Translate client.
 """
@@ -8,8 +7,10 @@ from __future__ import annotations
 import asyncio
 import json
 import random
+import warnings
+from collections.abc import Sequence
 from types import TracebackType
-from typing import Optional, Sequence, Union
+from typing import Any
 
 import httpx
 
@@ -17,7 +18,6 @@ from aiogtrans import urls
 from aiogtrans.cache import Cache
 from aiogtrans.constants import (
     DEFAULT_CLIENT_SERVICE_URLS,
-    DEFAULT_FALLBACK_SERVICE_URLS,
     DEFAULT_RAISE_EXCEPTION,
     DEFAULT_USER_AGENT,
     LANGCODES,
@@ -28,6 +28,7 @@ from aiogtrans.exceptions import HTTPError, TranslationError
 from aiogtrans.models import Detected, Translated, TranslatedPart
 
 RPC_ID = "MkEWBc"
+RETRY_STATUS_CODES = frozenset({429, 500, 502, 503, 504})
 
 
 class Translator:
@@ -47,13 +48,14 @@ class Translator:
     timeout:
         HTTP request timeout in seconds.
     use_fallback:
-        Use ``translate.googleapis.com`` (the ``gtx`` client type) instead of
-        the default ``tw-ob`` endpoint.
+        Deprecated and ignored. It previously targeted
+        ``translate.googleapis.com``, which rejects these requests.
     cache_capacity:
         Number of translation/detection results to cache in memory (LRU).
         ``0`` disables caching (default).
     retries:
-        Number of HTTP attempts before raising :class:`TranslationError`.
+        Number of HTTP attempts (on network errors and 429/5xx responses)
+        before giving up.
         Defaults to ``3``.
     """
 
@@ -62,22 +64,27 @@ class Translator:
         service_urls: Sequence[str] = DEFAULT_CLIENT_SERVICE_URLS,
         user_agent: str = DEFAULT_USER_AGENT,
         raise_exception: bool = DEFAULT_RAISE_EXCEPTION,
-        timeout: Union[int, float] = 10.0,
+        timeout: int | float = 10.0,
         use_fallback: bool = False,
         cache_capacity: int = 0,
         retries: int = 3,
-        _aclient: Optional[httpx.AsyncClient] = None,
+        _aclient: httpx.AsyncClient | None = None,
     ) -> None:
         self.raise_exception = raise_exception
         self.retries = retries
-        self._cache: Optional[Cache] = Cache(cache_capacity) if cache_capacity > 0 else None
+        self._cache: Cache | None = (
+            Cache(cache_capacity) if cache_capacity > 0 else None
+        )
 
         if use_fallback:
-            self.service_urls: Sequence[str] = DEFAULT_FALLBACK_SERVICE_URLS
-            self.client_type = "gtx"
-        else:
-            self.service_urls = service_urls
-            self.client_type = "tw-ob"
+            warnings.warn(
+                "use_fallback is deprecated and has no effect; the googleapis.com "
+                "endpoint does not support this client's API.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        self.service_urls = service_urls
+        self.client_type = "tw-ob"
 
         if _aclient is not None:
             self._aclient = _aclient
@@ -86,7 +93,9 @@ class Translator:
                 "User-Agent": user_agent,
                 "Referer": "https://translate.google.com",
             }
-            self._aclient = httpx.AsyncClient(headers=headers, timeout=timeout)
+            self._aclient = httpx.AsyncClient(
+                headers=headers, timeout=timeout, http2=True
+            )
 
     async def close(self) -> None:
         """Close the underlying HTTP client."""
@@ -97,9 +106,9 @@ class Translator:
 
     async def __aexit__(
         self,
-        exc_type: Optional[type[BaseException]],
-        exc_val: Optional[BaseException],
-        exc_tb: Optional[TracebackType],
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
     ) -> None:
         await self.close()
 
@@ -134,7 +143,7 @@ class Translator:
     ) -> tuple[str, httpx.Response]:
         url = urls.TRANSLATE_RPC.format(host=self._pick_service_url())
         data = {"f.req": self._build_rpc_request(text, dest, src)}
-        params = {
+        params: dict[str, str | int] = {
             "rpcids": RPC_ID,
             # NOTE: This build label is from 2020 and may become stale if Google
             # changes their API version checks. Update if translation stops working.
@@ -145,17 +154,21 @@ class Translator:
             "rt": "c",
         }
 
-        last_exc: Optional[Exception] = None
-        response: Optional[httpx.Response] = None
+        last_exc: Exception | None = None
+        response: httpx.Response | None = None
         for attempt in range(self.retries):
             try:
                 response = await self._aclient.post(url, params=params, data=data)
-                break
             except Exception as exc:
                 last_exc = exc
-                if attempt < self.retries - 1:
-                    await asyncio.sleep(2 ** attempt)
-        else:
+                response = None
+            else:
+                if response.status_code not in RETRY_STATUS_CODES:
+                    break
+            if attempt < self.retries - 1:
+                await asyncio.sleep(2**attempt)
+
+        if response is None:
             raise TranslationError(
                 f"Request failed after {self.retries} attempts"
             ) from last_exc
@@ -259,7 +272,7 @@ class Translator:
 
         should_spacing: bool = parsed[1][0][0][3]
         translated_parts: list[TranslatedPart] = [
-            TranslatedPart(part[0], part[1] if len(part) >= 2 else [])
+            TranslatedPart(part[0], (part[1] if len(part) >= 2 else None) or [])
             for part in parsed[1][0][0][5]
         ]
         translated = (" " if should_spacing else "").join(
@@ -277,28 +290,24 @@ class Translator:
             except (IndexError, KeyError):
                 pass
 
-        origin_pronunciation: Optional[str] = None
+        origin_pronunciation: str | None = None
         try:
             origin_pronunciation = parsed[0][0]
         except (IndexError, KeyError):
             pass
 
-        pronunciation: Optional[str] = None
+        pronunciation: str | None = None
         try:
             pronunciation = parsed[1][0][0][1]
         except (IndexError, KeyError):
             pass
 
-        extra_data: dict = {
+        extra_data: dict[str, Any] = {
             "confidence": None,
             "parts": translated_parts,
             "origin_pronunciation": origin_pronunciation,
             "parsed": parsed,
         }
-        try:
-            extra_data["confidence"] = parsed[0][1][0][0]
-        except (IndexError, KeyError, TypeError):
-            pass
 
         result = Translated(
             src=src,
@@ -336,7 +345,9 @@ class Translator:
         translated = await self.translate(text, src="auto", dest="en")
         result = Detected(
             lang=translated.src,
-            confidence=translated.extra_data.get("confidence") if translated.extra_data else None,
+            confidence=translated.extra_data.get("confidence")
+            if translated.extra_data
+            else None,
             response=translated.response,
         )
         if self._cache is not None:
@@ -348,6 +359,13 @@ class Translator:
         texts: list[str],
         dest: str = "en",
         src: str = "auto",
+        concurrency: int = 10,
     ) -> list[Translated]:
-        """Translate multiple texts concurrently."""
-        return list(await asyncio.gather(*[self.translate(t, dest=dest, src=src) for t in texts]))
+        """Translate multiple texts concurrently, at most *concurrency* at a time."""
+        semaphore = asyncio.Semaphore(concurrency)
+
+        async def translate_one(text: str) -> Translated:
+            async with semaphore:
+                return await self.translate(text, dest=dest, src=src)
+
+        return list(await asyncio.gather(*[translate_one(t) for t in texts]))

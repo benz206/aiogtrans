@@ -5,7 +5,6 @@ LRU cache for translation and detection results.
 from __future__ import annotations
 
 from collections import OrderedDict
-from typing import Optional, Union
 
 from .models import Detected, Translated
 
@@ -24,17 +23,17 @@ class Cache:
     """
 
     def __init__(self, capacity: int = 1000) -> None:
-        self._cache: OrderedDict[str, Union[Translated, Detected]] = OrderedDict()
+        self._cache: OrderedDict[str, Translated | Detected] = OrderedDict()
         self.capacity = capacity
 
-    def get(self, key: str) -> Optional[Union[Translated, Detected]]:
+    def get(self, key: str) -> Translated | Detected | None:
         """Return the cached value for *key*, or ``None`` if not present."""
         if key not in self._cache:
             return None
         self._cache.move_to_end(key)
         return self._cache[key]
 
-    def add(self, key: str, value: Union[Translated, Detected]) -> None:
+    def add(self, key: str, value: Translated | Detected) -> None:
         """Store *value* under *key*, evicting the oldest entry if over capacity."""
         self._cache[key] = value
         self._cache.move_to_end(key)

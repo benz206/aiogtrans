@@ -1,4 +1,0 @@
-Translator
-==========
-
-.. automodule:: aiogtrans.Translator

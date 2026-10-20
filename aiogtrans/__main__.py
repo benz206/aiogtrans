@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 import argparse
@@ -9,7 +8,7 @@ import sys
 from aiogtrans import Translator
 
 
-async def main() -> None:
+async def _main() -> None:
     parser = argparse.ArgumentParser(
         description="Python Google Translator as a command-line tool"
     )
@@ -38,17 +37,17 @@ async def main() -> None:
     try:
         async with Translator() as translator:
             if args.detect:
-                result = await translator.detect(args.text)
-                print(f"[{result.lang}, {result.confidence}] {args.text}")
+                detected = await translator.detect(args.text)
+                print(f"[{detected.lang}, {detected.confidence}] {args.text}")
             else:
-                result = await translator.translate(
+                translated = await translator.translate(
                     args.text, dest=args.dest, src=args.src
                 )
                 print(
-                    f"[{result.src}] {result.origin}\n"
+                    f"[{translated.src}] {translated.origin}\n"
                     f"    ->\n"
-                    f"[{result.dest}] {result.text}\n"
-                    f"[pron.] {result.pronunciation}"
+                    f"[{translated.dest}] {translated.text}\n"
+                    f"[pron.] {translated.pronunciation}"
                 )
     except ValueError as exc:
         print(f"Error: {exc}", file=sys.stderr)
@@ -58,5 +57,9 @@ async def main() -> None:
         sys.exit(1)
 
 
+def main() -> None:
+    asyncio.run(_main())
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

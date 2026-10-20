@@ -1,4 +1,3 @@
-
 DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
 
 DEFAULT_CLIENT_SERVICE_URLS = ("translate.google.com",)
@@ -119,6 +118,6 @@ LANGUAGES = {
     "zu": "zulu",
 }
 
-LANGCODES = dict(map(reversed, LANGUAGES.items()))
+LANGCODES: dict[str, str] = {name: code for code, name in LANGUAGES.items()}
 
 DEFAULT_RAISE_EXCEPTION = False

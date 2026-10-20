@@ -1,7 +1,6 @@
-
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any
 
 import httpx
 
@@ -11,11 +10,11 @@ class Base:
 
     __slots__ = ("_response",)
 
-    def __init__(self, response: Optional[httpx.Response] = None) -> None:
+    def __init__(self, response: httpx.Response | None = None) -> None:
         self._response = response
 
     @property
-    def response(self) -> Optional[httpx.Response]:
+    def response(self) -> httpx.Response | None:
         return self._response
 
 
@@ -73,10 +72,10 @@ class Translated(Base):
         dest: str,
         origin: str,
         text: str,
-        pronunciation: Optional[str],
+        pronunciation: str | None,
         parts: list[TranslatedPart],
-        extra_data: Optional[dict] = None,
-        **kwargs,
+        extra_data: dict[str, Any] | None = None,
+        **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
         self.src = src
@@ -114,7 +113,7 @@ class Detected(Base):
 
     __slots__ = ("lang", "confidence")
 
-    def __init__(self, lang: str, confidence: Optional[float], **kwargs) -> None:
+    def __init__(self, lang: str, confidence: float | None, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.lang = lang
         self.confidence = confidence
