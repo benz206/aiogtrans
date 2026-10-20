@@ -9,7 +9,7 @@ import sys
 from aiogtrans import Translator
 
 
-async def main() -> None:
+async def _main() -> None:
     parser = argparse.ArgumentParser(
         description="Python Google Translator as a command-line tool"
     )
@@ -58,5 +58,9 @@ async def main() -> None:
         sys.exit(1)
 
 
+def main() -> None:
+    asyncio.run(_main())
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
