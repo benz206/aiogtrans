@@ -27,7 +27,9 @@ from .conftest import (
 @pytest.mark.asyncio
 async def test_translate_basic() -> None:
     """translate() returns a Translated object with correct fields."""
-    response_text = make_rpc_response("Good evening.", src_lang="ko", pronunciation="Good evening.")
+    response_text = make_rpc_response(
+        "Good evening.", src_lang="ko", pronunciation="Good evening."
+    )
     translator = Translator(_aclient=make_mock_client(response_text))
 
     result = await translator.translate("안녕하세요.", dest="en")
@@ -252,7 +254,9 @@ async def test_no_raise_on_non_200_by_default(monkeypatch: pytest.MonkeyPatch) -
 @pytest.mark.asyncio
 async def test_translate_real_response_shape() -> None:
     """translate() parses a captured live response, including null candidates."""
-    translator = Translator(_aclient=make_mock_client(make_real_response(REAL_EO_PARSED)))
+    translator = Translator(
+        _aclient=make_mock_client(make_real_response(REAL_EO_PARSED))
+    )
 
     result = await translator.translate("Tiu frazo estas skribita en Esperanto.")
 
@@ -264,7 +268,9 @@ async def test_translate_real_response_shape() -> None:
 @pytest.mark.asyncio
 async def test_detect_ignores_spelling_suggestion() -> None:
     """detect() must not report Google's spelling suggestion as the confidence."""
-    translator = Translator(_aclient=make_mock_client(make_real_response(REAL_EO_PARSED)))
+    translator = Translator(
+        _aclient=make_mock_client(make_real_response(REAL_EO_PARSED))
+    )
 
     result = await translator.detect("Tiu frazo estas skribita en Esperanto.")
 
@@ -279,11 +285,17 @@ async def test_detect_ignores_spelling_suggestion() -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("status_code", [429, 503])
-async def test_retries_on_retryable_status(monkeypatch: pytest.MonkeyPatch, status_code: int) -> None:
+async def test_retries_on_retryable_status(
+    monkeypatch: pytest.MonkeyPatch, status_code: int
+) -> None:
     """A 429/5xx response is retried and a later 200 succeeds."""
     monkeypatch.setattr("aiogtrans.client.asyncio.sleep", AsyncMock())
     failed = MagicMock(spec=httpx.Response, status_code=status_code, text="")
-    ok = MagicMock(spec=httpx.Response, status_code=200, text=make_rpc_response("Hello", src_lang="es"))
+    ok = MagicMock(
+        spec=httpx.Response,
+        status_code=200,
+        text=make_rpc_response("Hello", src_lang="es"),
+    )
     mock_client = make_mock_client("")
     mock_client.post = AsyncMock(side_effect=[failed, ok])
     translator = Translator(_aclient=mock_client, raise_exception=True)
@@ -297,7 +309,11 @@ async def test_retries_on_retryable_status(monkeypatch: pytest.MonkeyPatch, stat
 @pytest.mark.asyncio
 async def test_translate_bulk_limits_concurrency() -> None:
     """translate_bulk() never has more than *concurrency* requests in flight."""
-    response = MagicMock(spec=httpx.Response, status_code=200, text=make_rpc_response("Hello", src_lang="es"))
+    response = MagicMock(
+        spec=httpx.Response,
+        status_code=200,
+        text=make_rpc_response("Hello", src_lang="es"),
+    )
     in_flight = peak = 0
 
     async def post(*args: object, **kwargs: object) -> httpx.Response:

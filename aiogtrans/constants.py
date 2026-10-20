@@ -1,4 +1,3 @@
-
 DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
 
 DEFAULT_CLIENT_SERVICE_URLS = ("translate.google.com",)

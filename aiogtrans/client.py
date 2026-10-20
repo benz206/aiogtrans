@@ -72,7 +72,9 @@ class Translator:
     ) -> None:
         self.raise_exception = raise_exception
         self.retries = retries
-        self._cache: Cache | None = Cache(cache_capacity) if cache_capacity > 0 else None
+        self._cache: Cache | None = (
+            Cache(cache_capacity) if cache_capacity > 0 else None
+        )
 
         if use_fallback:
             warnings.warn(
@@ -91,7 +93,9 @@ class Translator:
                 "User-Agent": user_agent,
                 "Referer": "https://translate.google.com",
             }
-            self._aclient = httpx.AsyncClient(headers=headers, timeout=timeout, http2=True)
+            self._aclient = httpx.AsyncClient(
+                headers=headers, timeout=timeout, http2=True
+            )
 
     async def close(self) -> None:
         """Close the underlying HTTP client."""
@@ -162,7 +166,7 @@ class Translator:
                 if response.status_code not in RETRY_STATUS_CODES:
                     break
             if attempt < self.retries - 1:
-                await asyncio.sleep(2 ** attempt)
+                await asyncio.sleep(2**attempt)
 
         if response is None:
             raise TranslationError(
@@ -341,7 +345,9 @@ class Translator:
         translated = await self.translate(text, src="auto", dest="en")
         result = Detected(
             lang=translated.src,
-            confidence=translated.extra_data.get("confidence") if translated.extra_data else None,
+            confidence=translated.extra_data.get("confidence")
+            if translated.extra_data
+            else None,
             response=translated.response,
         )
         if self._cache is not None:
