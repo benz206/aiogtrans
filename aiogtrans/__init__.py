@@ -16,8 +16,8 @@ __all__ = (
     "TranslationError",
 )
 
+from aiogtrans.cache import Cache
 from aiogtrans.client import Translator
 from aiogtrans.constants import LANGCODES, LANGUAGES
-from aiogtrans.models import Detected, Translated, TranslatedPart
-from aiogtrans.cache import Cache
 from aiogtrans.exceptions import HTTPError, TranslationError
+from aiogtrans.models import Detected, Translated, TranslatedPart

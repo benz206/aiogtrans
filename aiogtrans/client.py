@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Async Google Translate client.
 """
@@ -9,8 +8,9 @@ import asyncio
 import json
 import random
 import warnings
+from collections.abc import Sequence
 from types import TracebackType
-from typing import Optional, Sequence, Union
+from typing import Any
 
 import httpx
 
@@ -64,15 +64,15 @@ class Translator:
         service_urls: Sequence[str] = DEFAULT_CLIENT_SERVICE_URLS,
         user_agent: str = DEFAULT_USER_AGENT,
         raise_exception: bool = DEFAULT_RAISE_EXCEPTION,
-        timeout: Union[int, float] = 10.0,
+        timeout: int | float = 10.0,
         use_fallback: bool = False,
         cache_capacity: int = 0,
         retries: int = 3,
-        _aclient: Optional[httpx.AsyncClient] = None,
+        _aclient: httpx.AsyncClient | None = None,
     ) -> None:
         self.raise_exception = raise_exception
         self.retries = retries
-        self._cache: Optional[Cache] = Cache(cache_capacity) if cache_capacity > 0 else None
+        self._cache: Cache | None = Cache(cache_capacity) if cache_capacity > 0 else None
 
         if use_fallback:
             warnings.warn(
@@ -102,9 +102,9 @@ class Translator:
 
     async def __aexit__(
         self,
-        exc_type: Optional[type[BaseException]],
-        exc_val: Optional[BaseException],
-        exc_tb: Optional[TracebackType],
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
     ) -> None:
         await self.close()
 
@@ -139,7 +139,7 @@ class Translator:
     ) -> tuple[str, httpx.Response]:
         url = urls.TRANSLATE_RPC.format(host=self._pick_service_url())
         data = {"f.req": self._build_rpc_request(text, dest, src)}
-        params = {
+        params: dict[str, str | int] = {
             "rpcids": RPC_ID,
             # NOTE: This build label is from 2020 and may become stale if Google
             # changes their API version checks. Update if translation stops working.
@@ -150,8 +150,8 @@ class Translator:
             "rt": "c",
         }
 
-        last_exc: Optional[Exception] = None
-        response: Optional[httpx.Response] = None
+        last_exc: Exception | None = None
+        response: httpx.Response | None = None
         for attempt in range(self.retries):
             try:
                 response = await self._aclient.post(url, params=params, data=data)
@@ -286,19 +286,19 @@ class Translator:
             except (IndexError, KeyError):
                 pass
 
-        origin_pronunciation: Optional[str] = None
+        origin_pronunciation: str | None = None
         try:
             origin_pronunciation = parsed[0][0]
         except (IndexError, KeyError):
             pass
 
-        pronunciation: Optional[str] = None
+        pronunciation: str | None = None
         try:
             pronunciation = parsed[1][0][0][1]
         except (IndexError, KeyError):
             pass
 
-        extra_data: dict = {
+        extra_data: dict[str, Any] = {
             "confidence": None,
             "parts": translated_parts,
             "origin_pronunciation": origin_pronunciation,

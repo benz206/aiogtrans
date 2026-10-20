@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 import json
-from typing import Optional
 from unittest.mock import AsyncMock, MagicMock
 
 import httpx
-import pytest
 
 from aiogtrans.client import RPC_ID
 
@@ -15,8 +13,8 @@ from aiogtrans.client import RPC_ID
 def make_rpc_response(
     translated_text: str,
     src_lang: str = "ko",
-    pronunciation: Optional[str] = None,
-    origin_pronunciation: Optional[str] = None,
+    pronunciation: str | None = None,
+    origin_pronunciation: str | None = None,
     should_spacing: bool = False,
 ) -> str:
     """

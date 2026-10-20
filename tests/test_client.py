@@ -12,8 +12,12 @@ from aiogtrans import Translator
 from aiogtrans.exceptions import HTTPError, TranslationError
 from aiogtrans.models import Detected, Translated, TranslatedPart
 
-from .conftest import REAL_EO_PARSED, make_mock_client, make_real_response, make_rpc_response
-
+from .conftest import (
+    REAL_EO_PARSED,
+    make_mock_client,
+    make_real_response,
+    make_rpc_response,
+)
 
 # ---------------------------------------------------------------------------
 # translate()
@@ -108,6 +112,7 @@ async def test_translate_invalid_src_raises() -> None:
 async def test_translate_spacing() -> None:
     """translate() joins parts with a space when should_spacing is True."""
     import json
+
     from tests.conftest import RPC_ID
 
     parts = [["Hello", ["Hello"]], ["world", ["world"]]]

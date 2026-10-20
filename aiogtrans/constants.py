@@ -119,6 +119,6 @@ LANGUAGES = {
     "zu": "zulu",
 }
 
-LANGCODES = dict(map(reversed, LANGUAGES.items()))
+LANGCODES: dict[str, str] = {name: code for code, name in LANGUAGES.items()}
 
 DEFAULT_RAISE_EXCEPTION = False
