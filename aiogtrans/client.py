@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import json
 import random
+import warnings
 from types import TracebackType
 from typing import Optional, Sequence, Union
 
@@ -17,7 +18,6 @@ from aiogtrans import urls
 from aiogtrans.cache import Cache
 from aiogtrans.constants import (
     DEFAULT_CLIENT_SERVICE_URLS,
-    DEFAULT_FALLBACK_SERVICE_URLS,
     DEFAULT_RAISE_EXCEPTION,
     DEFAULT_USER_AGENT,
     LANGCODES,
@@ -48,8 +48,8 @@ class Translator:
     timeout:
         HTTP request timeout in seconds.
     use_fallback:
-        Use ``translate.googleapis.com`` (the ``gtx`` client type) instead of
-        the default ``tw-ob`` endpoint.
+        Deprecated and ignored. It previously targeted
+        ``translate.googleapis.com``, which rejects these requests.
     cache_capacity:
         Number of translation/detection results to cache in memory (LRU).
         ``0`` disables caching (default).
@@ -75,11 +75,14 @@ class Translator:
         self._cache: Optional[Cache] = Cache(cache_capacity) if cache_capacity > 0 else None
 
         if use_fallback:
-            self.service_urls: Sequence[str] = DEFAULT_FALLBACK_SERVICE_URLS
-            self.client_type = "gtx"
-        else:
-            self.service_urls = service_urls
-            self.client_type = "tw-ob"
+            warnings.warn(
+                "use_fallback is deprecated and has no effect; the googleapis.com "
+                "endpoint does not support this client's API.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        self.service_urls = service_urls
+        self.client_type = "tw-ob"
 
         if _aclient is not None:
             self._aclient = _aclient

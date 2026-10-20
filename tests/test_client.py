@@ -311,3 +311,11 @@ async def test_translate_bulk_limits_concurrency() -> None:
 
     assert len(results) == 20
     assert peak == 3
+
+
+def test_use_fallback_is_deprecated() -> None:
+    """use_fallback warns and falls back to the working default endpoint."""
+    with pytest.warns(DeprecationWarning, match="use_fallback"):
+        translator = Translator(use_fallback=True, _aclient=make_mock_client(""))
+
+    assert translator.service_urls == ("translate.google.com",)
