@@ -91,7 +91,7 @@ class Translator:
                 "User-Agent": user_agent,
                 "Referer": "https://translate.google.com",
             }
-            self._aclient = httpx.AsyncClient(headers=headers, timeout=timeout)
+            self._aclient = httpx.AsyncClient(headers=headers, timeout=timeout, http2=True)
 
     async def close(self) -> None:
         """Close the underlying HTTP client."""

@@ -11,7 +11,7 @@ license = { text = "MIT" }
 authors = [{ name = "Ben Z", email = "bleg3ndary@gmail.com" }]
 keywords = ["google", "translate", "translator", "async"]
 requires-python = ">=3.9"
-dependencies = ["httpx>=0.23.0,<1.0.0"]
+dependencies = ["httpx[http2]>=0.23.0,<1.0.0"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Education",
