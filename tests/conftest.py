@@ -58,3 +58,20 @@ def make_mock_client(response_text: str, status_code: int = 200) -> httpx.AsyncC
     mock_client.post = AsyncMock(return_value=mock_response)
     mock_client.aclose = AsyncMock()
     return mock_client
+
+
+# Captured from a live translate.google.com response (eo -> en) in 2026. Note the
+# spelling suggestion at [0][1] and the null candidates in each part.
+REAL_EO_PARSED = [
+    [None, [[[None, "<b><i>Tu</i></b> frazo estas skribita en Esperanto."], None, 2, [1], "Tu frazo estas skribita en Esperanto."]], "eo", [[[0, [[[None, 38]], [True]]]], 38], None, None, ["Tiu frazo estas skribita en Esperanto.", "auto", "en", True]],
+    [[[None, None, None, None, None, [["That sentence is written in Esperanto.", None, None, None, None, None, "Tiu frazo estas skribita en Esperanto.", 1]], None, None, None, []]], "en", 1, "eo", ["Tiu frazo estas skribita en Esperanto.", "auto", "en", True]],
+    "eo", None, None, None, None, [[[0], [[6, 1]]]],
+]
+
+
+def make_real_response(parsed: list) -> str:
+    """Wrap *parsed* in the envelope that batchexecute actually returns."""
+    inner_str = json.dumps(parsed, separators=(",", ":"))
+    outer = [["wrb.fr", RPC_ID, inner_str, None, None, None, "generic"], ["di", 876]]
+    outer_str = json.dumps(outer, separators=(",", ":"))
+    return f")]}}'\n\n{len(outer_str)}\n{outer_str}\n25\n[[\"e\",4,null,null,414]]\n"

@@ -259,7 +259,7 @@ class Translator:
 
         should_spacing: bool = parsed[1][0][0][3]
         translated_parts: list[TranslatedPart] = [
-            TranslatedPart(part[0], part[1] if len(part) >= 2 else [])
+            TranslatedPart(part[0], (part[1] if len(part) >= 2 else None) or [])
             for part in parsed[1][0][0][5]
         ]
         translated = (" " if should_spacing else "").join(
@@ -295,10 +295,6 @@ class Translator:
             "origin_pronunciation": origin_pronunciation,
             "parsed": parsed,
         }
-        try:
-            extra_data["confidence"] = parsed[0][1][0][0]
-        except (IndexError, KeyError, TypeError):
-            pass
 
         result = Translated(
             src=src,

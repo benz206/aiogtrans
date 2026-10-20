@@ -8,7 +8,7 @@ from aiogtrans import Translator
 from aiogtrans.exceptions import HTTPError, TranslationError
 from aiogtrans.models import Detected, Translated, TranslatedPart
 
-from .conftest import make_mock_client, make_rpc_response
+from .conftest import REAL_EO_PARSED, make_mock_client, make_real_response, make_rpc_response
 
 
 # ---------------------------------------------------------------------------
@@ -231,3 +231,31 @@ async def test_no_raise_on_non_200_by_default() -> None:
 
     with pytest.raises(TranslationError, match="Failed to parse"):
         await translator.translate("hello", dest="en")
+
+
+# ---------------------------------------------------------------------------
+# Real response shape
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_translate_real_response_shape() -> None:
+    """translate() parses a captured live response, including null candidates."""
+    translator = Translator(_aclient=make_mock_client(make_real_response(REAL_EO_PARSED)))
+
+    result = await translator.translate("Tiu frazo estas skribita en Esperanto.")
+
+    assert result.src == "eo"
+    assert result.text == "That sentence is written in Esperanto."
+    assert result.parts[0].candidates == []
+
+
+@pytest.mark.asyncio
+async def test_detect_ignores_spelling_suggestion() -> None:
+    """detect() must not report Google's spelling suggestion as the confidence."""
+    translator = Translator(_aclient=make_mock_client(make_real_response(REAL_EO_PARSED)))
+
+    result = await translator.detect("Tiu frazo estas skribita en Esperanto.")
+
+    assert result.lang == "eo"
+    assert result.confidence is None
