@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
+from unittest.mock import AsyncMock, MagicMock
+
+import httpx
 import pytest
 
 from aiogtrans import Translator
@@ -208,8 +212,9 @@ async def test_context_manager_closes_client() -> None:
 
 
 @pytest.mark.asyncio
-async def test_raise_exception_on_non_200() -> None:
+async def test_raise_exception_on_non_200(monkeypatch: pytest.MonkeyPatch) -> None:
     """raise_exception=True causes an HTTPError on non-200 status codes."""
+    monkeypatch.setattr("aiogtrans.client.asyncio.sleep", AsyncMock())
     translator = Translator(
         _aclient=make_mock_client("", status_code=429),
         raise_exception=True,
@@ -220,10 +225,11 @@ async def test_raise_exception_on_non_200() -> None:
 
 
 @pytest.mark.asyncio
-async def test_no_raise_on_non_200_by_default() -> None:
+async def test_no_raise_on_non_200_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
     """raise_exception=False (default) does not raise on non-200 status."""
     # The response body is empty so JSON parsing will fail — we just want to
     # confirm that the HTTP status itself does NOT raise.
+    monkeypatch.setattr("aiogtrans.client.asyncio.sleep", AsyncMock())
     translator = Translator(
         _aclient=make_mock_client("", status_code=429),
         raise_exception=False,
@@ -259,3 +265,49 @@ async def test_detect_ignores_spelling_suggestion() -> None:
 
     assert result.lang == "eo"
     assert result.confidence is None
+
+
+# ---------------------------------------------------------------------------
+# Retries and concurrency
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status_code", [429, 503])
+async def test_retries_on_retryable_status(monkeypatch: pytest.MonkeyPatch, status_code: int) -> None:
+    """A 429/5xx response is retried and a later 200 succeeds."""
+    monkeypatch.setattr("aiogtrans.client.asyncio.sleep", AsyncMock())
+    failed = MagicMock(spec=httpx.Response, status_code=status_code, text="")
+    ok = MagicMock(spec=httpx.Response, status_code=200, text=make_rpc_response("Hello", src_lang="es"))
+    mock_client = make_mock_client("")
+    mock_client.post = AsyncMock(side_effect=[failed, ok])
+    translator = Translator(_aclient=mock_client, raise_exception=True)
+
+    result = await translator.translate("Hola", src="es")
+
+    assert result.text == "Hello"
+    assert mock_client.post.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_translate_bulk_limits_concurrency() -> None:
+    """translate_bulk() never has more than *concurrency* requests in flight."""
+    response = MagicMock(spec=httpx.Response, status_code=200, text=make_rpc_response("Hello", src_lang="es"))
+    in_flight = peak = 0
+
+    async def post(*args: object, **kwargs: object) -> httpx.Response:
+        nonlocal in_flight, peak
+        in_flight += 1
+        peak = max(peak, in_flight)
+        await asyncio.sleep(0)
+        in_flight -= 1
+        return response
+
+    mock_client = make_mock_client("")
+    mock_client.post = post
+    translator = Translator(_aclient=mock_client)
+
+    results = await translator.translate_bulk(["Hola"] * 20, src="es", concurrency=3)
+
+    assert len(results) == 20
+    assert peak == 3

@@ -28,6 +28,7 @@ from aiogtrans.exceptions import HTTPError, TranslationError
 from aiogtrans.models import Detected, Translated, TranslatedPart
 
 RPC_ID = "MkEWBc"
+RETRY_STATUS_CODES = frozenset({429, 500, 502, 503, 504})
 
 
 class Translator:
@@ -53,7 +54,8 @@ class Translator:
         Number of translation/detection results to cache in memory (LRU).
         ``0`` disables caching (default).
     retries:
-        Number of HTTP attempts before raising :class:`TranslationError`.
+        Number of HTTP attempts (on network errors and 429/5xx responses)
+        before giving up.
         Defaults to ``3``.
     """
 
@@ -150,12 +152,16 @@ class Translator:
         for attempt in range(self.retries):
             try:
                 response = await self._aclient.post(url, params=params, data=data)
-                break
             except Exception as exc:
                 last_exc = exc
-                if attempt < self.retries - 1:
-                    await asyncio.sleep(2 ** attempt)
-        else:
+                response = None
+            else:
+                if response.status_code not in RETRY_STATUS_CODES:
+                    break
+            if attempt < self.retries - 1:
+                await asyncio.sleep(2 ** attempt)
+
+        if response is None:
             raise TranslationError(
                 f"Request failed after {self.retries} attempts"
             ) from last_exc
@@ -344,6 +350,13 @@ class Translator:
         texts: list[str],
         dest: str = "en",
         src: str = "auto",
+        concurrency: int = 10,
     ) -> list[Translated]:
-        """Translate multiple texts concurrently."""
-        return list(await asyncio.gather(*[self.translate(t, dest=dest, src=src) for t in texts]))
+        """Translate multiple texts concurrently, at most *concurrency* at a time."""
+        semaphore = asyncio.Semaphore(concurrency)
+
+        async def translate_one(text: str) -> Translated:
+            async with semaphore:
+                return await self.translate(text, dest=dest, src=src)
+
+        return list(await asyncio.gather(*[translate_one(t) for t in texts]))
